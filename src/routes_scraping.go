@@ -66,7 +66,15 @@ func scrapeSources() {
 func scrapeSource(sourceID int, url string, db *sql.DB) {
     c := colly.NewCollector()
 
+    // Create a counter to keep track of the number of articles scraped
+    var counter int
+
     c.OnHTML("article", func(e *colly.HTMLElement) {
+        // If we've already scraped 10 articles, return
+        if counter >= 10 {
+            return
+        }
+
         title := e.ChildText("h1, h2, h3")
         author := e.ChildText(".author")
         content := e.ChildText("p")
@@ -74,6 +82,8 @@ func scrapeSource(sourceID int, url string, db *sql.DB) {
 
         if title != "" {
             insertArticle(db, sourceID, title, author, content, articleURL)
+            counter++
+            log.Printf("Scraped %d out of 10 articles from %s\n", counter, url)
         }
     })
 
