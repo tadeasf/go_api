@@ -37,8 +37,7 @@ func main() {
 	r := gin.Default()
 	r.Use(CORSMiddleware())
 
-	initializeRoutes(r)
-	initializeScrapingRoutes(r) // Add this line to initialize scraping routes
+    initializeDatabaseRoutes(r)
 
 	// Start an HTTP server listening on port 8080
 	fmt.Println("Server is listening on port 8080...")

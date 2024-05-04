@@ -4,9 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"time"
 
 	// Make sure to import the Postgres driver
+	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
 
@@ -24,6 +27,10 @@ func getDbConnection() (*sql.DB, error) {
 
     // Open the connection
     db, err := sql.Open("postgres", psqlInfo)
+    db.SetMaxOpenConns(25) // Set max. number of open connections to the database.
+    db.SetMaxIdleConns(25) // Set max. number of connections in the idle connection pool.
+    db.SetConnMaxLifetime(time.Minute * 5) // Set the max. amount of time a connection may be reused.
+
     if err != nil {
         return nil, err
     }
@@ -44,31 +51,32 @@ func initDB() {
     }
     defer db.Close()
 
-    // Create news_sources table if it does not exist
-    createNewsSourcesTableSQL := `CREATE TABLE IF NOT EXISTS news_sources (
-        id SERIAL PRIMARY KEY,
-        root_url VARCHAR(255) NOT NULL,
-        name VARCHAR(100) NOT NULL
-    );`
-    _, err = db.Exec(createNewsSourcesTableSQL)
-    if err != nil {
-        log.Fatalf("Could not create news_sources table: %v", err)
-    }
+    // Create the tables
 
-    // Create articles table with a uniqueness constraint on the url column
-    createArticlesTableSQL := `CREATE TABLE IF NOT EXISTS articles (
-        id SERIAL PRIMARY KEY,
-        scraped_at TIMESTAMP WITH TIME ZONE NOT NULL,
-        title TEXT NOT NULL,
-        author TEXT,  -- Can be empty
-        content TEXT NOT NULL,
-        source_id INTEGER REFERENCES news_sources(id),  -- Foreign Key to news_sources table
-        url TEXT NOT NULL UNIQUE
-    );`
-    _, err = db.Exec(createArticlesTableSQL)
-    if err != nil {
-        log.Fatalf("Could not create or modify articles table: %v", err)
-    }
+    // Create the users table
 
     fmt.Println("Tables creation/check completed successfully")
+}
+
+func dbCheckHandler(c *gin.Context) {
+    db, err := getDbConnection()
+    if err != nil {
+        c.String(http.StatusInternalServerError, "Failed to connect to database")
+        return
+    }
+    defer db.Close()
+
+    // Simple check if we can retrieve something from the database
+    var count int
+    err = db.QueryRow("SELECT 1").Scan(&count)
+    if err != nil {
+        c.String(http.StatusInternalServerError, "Database error")
+        return
+    }
+
+    c.String(http.StatusOK, "Successfully connected to database")
+}
+
+func initializeDatabaseRoutes(r *gin.Engine) {
+    r.GET("/db-check", dbCheckHandler)
 }
