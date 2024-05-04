@@ -1,0 +1,33 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyc
+
+# JavaScript & TypeScript artifacts
+node_modules/
+dist/
+build/
+*.log
+
+# Golang artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+vendor/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Data files
+*.json
+*.csv
+
