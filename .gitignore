@@ -3,6 +3,7 @@
 .env.local
 .env.*.local
 go.sum
+/src/myapp
 # Python artifacts
 __pycache__/
 *.py[cod]
