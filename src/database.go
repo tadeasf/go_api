@@ -55,16 +55,16 @@ func initDB() {
         log.Fatalf("Could not create news_sources table: %v", err)
     }
 
-    // Modify articles table as required
-	createArticlesTableSQL := `CREATE TABLE IF NOT EXISTS articles (
-		id SERIAL PRIMARY KEY,
-		scraped_at TIMESTAMP WITH TIME ZONE NOT NULL,
-		title TEXT NOT NULL,
-		author TEXT,  -- Can be empty
-		content TEXT NOT NULL,
-		source_id INTEGER REFERENCES news_sources(id),  -- Foreign Key to news_sources table
-		url TEXT NOT NULL
-	);`
+    // Create articles table with a uniqueness constraint on the url column
+    createArticlesTableSQL := `CREATE TABLE IF NOT EXISTS articles (
+        id SERIAL PRIMARY KEY,
+        scraped_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        title TEXT NOT NULL,
+        author TEXT,  -- Can be empty
+        content TEXT NOT NULL,
+        source_id INTEGER REFERENCES news_sources(id),  -- Foreign Key to news_sources table
+        url TEXT NOT NULL UNIQUE
+    );`
     _, err = db.Exec(createArticlesTableSQL)
     if err != nil {
         log.Fatalf("Could not create or modify articles table: %v", err)

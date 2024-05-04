@@ -4,8 +4,9 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
-	"sync"
 	"time"
+
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gocolly/colly/v2"
@@ -29,69 +30,56 @@ func scrapeSources() {
     }
     defer db.Close()
 
-    var sources []struct {
-        ID      int
-        RootURL string
-    }
-    rows, err := db.Query("SELECT id, root_url FROM news_sources")
-    if err != nil {
-        log.Printf("Failed to query sources: %v\n", err)
-        return
-    }
-    defer rows.Close()
-
-    for rows.Next() {
-        var s struct {
-            ID      int
-            RootURL string
-        }
-        if err := rows.Scan(&s.ID, &s.RootURL); err != nil {
-            log.Printf("Failed to scan source: %v\n", err)
-            continue
-        }
-        sources = append(sources, s)
-    }
-
-    var wg sync.WaitGroup
-    for _, source := range sources {
-        wg.Add(1)
-        go func(source struct{ ID int; RootURL string }) {
-            defer wg.Done()
-            scrapeSource(source.ID, source.RootURL, db)
-        }(source)
-    }
-    wg.Wait()
+    // Assuming BBC News is the source we want to scrape
+    scrapeBBCNews(db)
 }
 
-func scrapeSource(sourceID int, url string, db *sql.DB) {
+func scrapeBBCNews(db *sql.DB) {
+    sourceID := 1 // Assuming BBC News has ID 1 in your `news_sources` table
+    rootURL := "https://www.bbc.com/news"
+
     c := colly.NewCollector()
 
-    // Create a counter to keep track of the number of articles scraped
-    var counter int
-
-    c.OnHTML("article", func(e *colly.HTMLElement) {
-        // If we've already scraped 10 articles, return
-        if counter >= 10 {
-            return
-        }
-
-        title := e.ChildText("h1, h2, h3")
-        author := e.ChildText(".author")
-        content := e.ChildText("p")
-        articleURL := e.Request.URL.String() // Assuming the article's URL is the page URL
-
-        if title != "" {
-            insertArticle(db, sourceID, title, author, content, articleURL)
-            counter++
-            log.Printf("Scraped %d out of 10 articles from %s\n", counter, url)
+    // Find and visit all links
+    c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+        link := e.Attr("href")
+        if strings.HasPrefix(link, "/news/") {
+            articleURL := "https://www.bbc.com" + link
+            go visitArticlePage(sourceID, articleURL, db)
         }
     })
 
-    c.Visit(url)
+    c.Visit(rootURL)
+}
+
+func visitArticlePage(sourceID int, articleURL string, db *sql.DB) {
+    articleCollector := colly.NewCollector()
+
+    var title, author, content string
+
+    articleCollector.OnHTML("h1.sc-82e6a0ec-0.fxXQuy", func(e *colly.HTMLElement) {
+        title = e.Text
+    })
+
+    articleCollector.OnHTML("span[data-testid='byline-name'].sc-53757630-5.jMdGt", func(e *colly.HTMLElement) {
+        author = e.Text
+    })
+
+    articleCollector.OnHTML("p.sc-e1853509-0.bmLndb", func(e *colly.HTMLElement) {
+        content += e.Text + "\n"
+    })
+
+    articleCollector.OnScraped(func(r *colly.Response) {
+        if title != "" {
+            insertArticle(db, sourceID, title, author, content, articleURL)
+        }
+    })
+
+    articleCollector.Visit(articleURL)
 }
 
 func insertArticle(db *sql.DB, sourceID int, title, author, content, url string) {
-    _, err := db.Exec("INSERT INTO articles (scraped_at, title, author, content, source_id, url) VALUES ($1, $2, $3, $4, $5, $6)", time.Now(), title, author, content, sourceID, url)
+    _, err := db.Exec("INSERT INTO articles (scraped_at, title, author, content, source_id, url) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (url) DO NOTHING", time.Now(), title, author, content, sourceID, url)
     if err != nil {
         log.Printf("Failed to insert article: %v\n", err)
     }
