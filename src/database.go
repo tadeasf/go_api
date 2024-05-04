@@ -10,7 +10,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// getDbConnection establishes a connection to the database and returns the connection object.
 func getDbConnection() (*sql.DB, error) {
     // Retrieve environment variables
     psqlUser := os.Getenv("PSQL_USER")
@@ -38,8 +37,6 @@ func getDbConnection() (*sql.DB, error) {
     return db, nil
 }
 
-// initDB checks for the existence of the 'news_sources' table and creates it if it does not exist.
-// initDB checks for the existence of the 'news_sources' and 'articles' tables and creates them if they do not exist.
 func initDB() {
     db, err := getDbConnection()
     if err != nil {
@@ -58,18 +55,19 @@ func initDB() {
         log.Fatalf("Could not create news_sources table: %v", err)
     }
 
-    // Create articles table if it does not exist
+    // Modify articles table as required
     createArticlesTableSQL := `CREATE TABLE IF NOT EXISTS articles (
         id SERIAL PRIMARY KEY,
-        published_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        scraped_at TIMESTAMP WITH TIME ZONE NOT NULL,
         title TEXT NOT NULL,
-        author TEXT,  -- Can be empty
+        author TEXT,  // Can be empty
         content TEXT NOT NULL,
-        source_id INTEGER REFERENCES news_sources(id)  -- Foreign Key to news_sources table
+        source_id INTEGER REFERENCES news_sources(id),  // Foreign Key to news_sources table
+        url TEXT NOT NULL
     );`
     _, err = db.Exec(createArticlesTableSQL)
     if err != nil {
-        log.Fatalf("Could not create articles table: %v", err)
+        log.Fatalf("Could not create or modify articles table: %v", err)
     }
 
     fmt.Println("Tables creation/check completed successfully")

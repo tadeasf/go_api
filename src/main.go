@@ -38,6 +38,7 @@ func main() {
 	r.Use(CORSMiddleware())
 
 	initializeRoutes(r)
+	initializeScrapingRoutes(r) // Add this line to initialize scraping routes
 
 	// Start an HTTP server listening on port 8080
 	fmt.Println("Server is listening on port 8080...")
